@@ -1,44 +1,14 @@
 /**
  * Zero-knowledge encryption helpers.
  * Uses the browser's native SubtleCrypto API — zero external dependencies.
- * PBKDF2-SHA256 key derivation + AES-256-GCM field encryption.
+ * AES-256-GCM field encryption using the active data-encryption key.
  */
 
-const PBKDF2_ITERATIONS = 600_000;
-const ZK_VERIFY_CONSTANT = 'pls-calendar-zk-v1';
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
 /** Shown in place of a field whose decryption failed, instead of garbled base64. */
 export const DECRYPT_FAILURE_PLACEHOLDER = "🔒 couldn't decrypt";
-
-// ── Salt generation ───────────────────────────────────────────────────────────
-
-/** Generate a random 32-byte salt as a hex string. */
-export function generateSalt() {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-// ── Key derivation ────────────────────────────────────────────────────────────
-
-/**
- * Derives a 256-bit AES-GCM CryptoKey from a password + hex salt.
- * This is the master key — it never leaves JS memory.
- */
-export async function deriveKey(password, saltHex) {
-  const saltBytes = hexToBytes(saltHex);
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']
-  );
-  return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt: saltBytes, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
-    keyMaterial,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt']
-  );
-}
 
 // ── Field encryption / decryption ─────────────────────────────────────────────
 
@@ -80,33 +50,7 @@ export async function decryptField(masterKey, ciphertext) {
   }
 }
 
-// ── Key verification ──────────────────────────────────────────────────────────
-
-/** Generate the verification blob: encrypts a known constant. */
-export async function generateVerifyBlob(masterKey) {
-  return encryptField(masterKey, ZK_VERIFY_CONSTANT);
-}
-
-/**
- * Returns true if masterKey can decrypt the blob and the result matches the constant.
- * Used at login to confirm the password is correct before proceeding.
- */
-export async function verifyKey(masterKey, blob) {
-  try {
-    const result = await decryptField(masterKey, blob);
-    return result === ZK_VERIFY_CONSTANT;
-  } catch {
-    return false;
-  }
-}
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function hexToBytes(hex) {
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < hex.length; i += 2) bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
-  return bytes;
-}
 
 function bytesToBase64(bytes) {
   return btoa(String.fromCharCode(...bytes));

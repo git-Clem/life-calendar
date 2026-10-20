@@ -1,12 +1,5 @@
 import { Alert, Linking } from 'react-native';
 
-export const MAP_PROVIDERS = [
-  { id: 'apple', label: 'Apple Maps' },
-  { id: 'google', label: 'Google Maps' },
-  { id: 'waze', label: 'Waze' },
-  { id: 'copy', label: 'Copy address' },
-];
-
 export function buildMapUrl(provider, destination) {
   const encoded = encodeURIComponent(String(destination || '').trim());
   if (!encoded) return '';

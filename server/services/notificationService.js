@@ -397,8 +397,4 @@ export function startScheduler() {
   console.log('[notify] Notification scheduler started (60s interval)');
 }
 
-export function stopScheduler() {
-  if (intervalHandle) { clearInterval(intervalHandle); intervalHandle = null; }
-}
-
 export { dispatchToIntegration, dispatchWebhook, discordPayload, slackPayload, dispatchWebPush, dispatchExpoPush, dispatchEmail, dispatchSms };

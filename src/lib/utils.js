@@ -187,10 +187,6 @@ export function getEventEndDateTime(event) {
   return d;
 }
 
-export function isEventPastDue(event, now = new Date()) {
-  return getEventEndDateTime(event) <= now;
-}
-
 export function generateRepeatInstances(baseEvent, repeat) {
   const baseDate = new Date(baseEvent.week_start + 'T00:00:00');
   baseDate.setDate(baseDate.getDate() + baseEvent.day_of_week);

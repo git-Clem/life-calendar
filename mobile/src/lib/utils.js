@@ -115,7 +115,3 @@ export function getEventEndDateTime(event) {
   return d;
 }
 
-export function isEventPastDue(event, now = new Date()) {
-  return getEventEndDateTime(event) <= now;
-}
-

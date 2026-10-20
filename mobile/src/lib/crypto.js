@@ -1,48 +1,21 @@
 /**
  * Zero-knowledge encryption helpers — React Native edition.
  *
- * Mirrors src/lib/crypto.js on the web exactly (PBKDF2-SHA256 600k
- * iterations + AES-256-GCM, blob = base64(iv + ciphertext + tag)) so a
- * key derived on either platform decrypts data written by the other.
+ * Mirrors src/lib/crypto.js field encryption on the web exactly
+ * (AES-256-GCM, blob = base64(iv + ciphertext + tag)) so the active
+ * data-encryption key decrypts data written by either platform.
  * Uses the audited pure-JS @noble libraries since React Native has no
  * SubtleCrypto.
  */
 import 'react-native-get-random-values';
-import { pbkdf2 } from '@noble/hashes/pbkdf2.js';
-import { sha256 } from '@noble/hashes/sha2.js';
 import { randomBytes } from '@noble/hashes/utils.js';
 import { gcm } from '@noble/ciphers/aes.js';
 
-const PBKDF2_ITERATIONS = 600_000;
-const ZK_VERIFY_CONSTANT = 'pls-calendar-zk-v1';
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
 /** Shown in place of a field whose decryption failed, instead of garbled base64. */
 export const DECRYPT_FAILURE_PLACEHOLDER = "🔒 couldn't decrypt";
-
-// ── Salt generation ───────────────────────────────────────────────────────────
-
-/** Generate a random 32-byte salt as a hex string. */
-export function generateSalt() {
-  return Array.from(randomBytes(32)).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-// ── Key derivation ────────────────────────────────────────────────────────────
-
-/**
- * Derives the 256-bit master key from a password + hex salt.
- * Returns a Uint8Array (kept in JS memory only — never persisted).
- * CPU-bound: takes a few seconds on a phone; callers should show a spinner.
- */
-export async function deriveKey(password, saltHex) {
-  // Yield to the UI thread once before the synchronous PBKDF2 burn
-  await new Promise(r => setTimeout(r, 30));
-  return pbkdf2(sha256, enc.encode(password), hexToBytes(saltHex), {
-    c: PBKDF2_ITERATIONS,
-    dkLen: 32,
-  });
-}
 
 // ── Field encryption / decryption ─────────────────────────────────────────────
 
@@ -77,29 +50,7 @@ export async function decryptField(masterKey, ciphertext) {
   }
 }
 
-// ── Key verification ──────────────────────────────────────────────────────────
-
-/** Generate the verification blob: encrypts a known constant. */
-export async function generateVerifyBlob(masterKey) {
-  return encryptField(masterKey, ZK_VERIFY_CONSTANT);
-}
-
-/** Returns true if masterKey decrypts the blob to the known constant. */
-export async function verifyKey(masterKey, blob) {
-  try {
-    return (await decryptField(masterKey, blob)) === ZK_VERIFY_CONSTANT;
-  } catch {
-    return false;
-  }
-}
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function hexToBytes(hex) {
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < hex.length; i += 2) bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
-  return bytes;
-}
 
 const B64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 

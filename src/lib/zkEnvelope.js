@@ -26,11 +26,10 @@
 const PBKDF2_ITERS = 600_000;
 const SALT_BYTES   = 16;
 const IV_BYTES     = 12;
-const PREFIX       = 'zk1:';      // marks our ciphertext so decrypt can pass plaintext through
+const PREFIX       = 'zk1:';      // marks wrapped-DEK blobs
 
 const subtle = globalThis.crypto.subtle;
 const enc = new TextEncoder();
-const dec = new TextDecoder();
 
 // ── base64 helpers (work in browser + Node) ──────────────────────────────────
 function toB64(bytes) {
@@ -198,21 +197,6 @@ export async function rewrapForPassword(dek, newPassword) {
   };
 }
 
-/** Regenerate the recovery code (re-wraps the DEK under a fresh code). Old code dies. */
-export async function rewrapForRecovery(dek) {
-  const recoverySalt = generateSalt();
-  const recoveryAuthSalt = generateSalt();
-  const recoveryCode = generateRecoveryCode();
-  const normCode = normalizeRecoveryCode(recoveryCode);
-  const key = await deriveWrappingKey(normCode, recoverySalt);
-  return {
-    recoverySalt, recoveryAuthSalt,
-    recoveryVerifier:   await deriveAuthVerifier(normCode, recoveryAuthSalt),
-    wrappedDekRecovery: await wrapDEK(dek, key),
-    recoveryCode,
-  };
-}
-
 // ── Google linked-login wrap ──────────────────────────────────────────────────
 /**
  * Wrap the DEK under a fresh random 256-bit secret for the "Sign in with Google"
@@ -245,27 +229,4 @@ export async function exportDek(dek) {
 }
 export async function importDek(b64) {
   return subtle.importKey('raw', fromB64(b64), { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
-}
-
-// ── field encryption ─────────────────────────────────────────────────────────
-export function isCiphertext(value) {
-  return typeof value === 'string' && value.startsWith(PREFIX);
-}
-
-/** Encrypt a string field with the DEK. Null/empty pass through unchanged. */
-export async function encryptField(dek, plaintext) {
-  if (plaintext == null || plaintext === '') return plaintext;
-  const iv = randomBytes(IV_BYTES);
-  const ct = await subtle.encrypt({ name: 'AES-GCM', iv }, dek, enc.encode(String(plaintext)));
-  return PREFIX + toB64(new Uint8Array([...iv, ...new Uint8Array(ct)]));
-}
-
-/** Decrypt a field. Non-ciphertext (legacy plaintext) passes through unchanged. */
-export async function decryptField(dek, value) {
-  if (!isCiphertext(value)) return value;
-  const data = fromB64(value.slice(PREFIX.length));
-  const iv = data.subarray(0, IV_BYTES);
-  const ct = data.subarray(IV_BYTES);
-  const pt = await subtle.decrypt({ name: 'AES-GCM', iv }, dek, ct);
-  return dec.decode(pt);
 }
